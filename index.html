@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    :root {
+      --location-dot-color: #138d44;
+    }
+
+    .location {
+      align-items: center;
+      background-color: #FFFFFF;
+      border-radius: 50%;
+      color: #263238;
+      display: flex;
+      font-size: 14px;
+      gap: 15px;
+      height: 30px;
+      justify-content: center;
+      padding: 4px;
+      position: relative;
+      position: relative;
+      transition: all 0.3s ease-out;
+      width: 30px;
+    }
+
+    .location::after {
+      border-left: 9px solid transparent;
+      border-right: 9px solid transparent;
+      border-top: 9px solid #FFFFFF;
+      content: "";
+      height: 0;
+      left: 50%;
+      position: absolute;
+      top: 95%;
+      transform: translate(-50%, 0);
+      transition: all 0.3s ease-out;
+      width: 0;
+      z-index: 1;
+    }
+
+    .location .mapIcon {
+      align-items: center;
+      display: flex;
+      justify-content: center;
+      color: #FFFFFF;
+    }
+
+    .location .mapIcon svg {
+      height: 20px;
+      width: auto;
+    }
+
+    .location .details {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .location .address {
+      color: #9E9E9E;
+      font-size: 12px;
+      margin-bottom: 1px;
+      margin-top: 5px;
+    }
+
+    .location .more {
+      align-items: flex-end;
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      padding-top: 5px;
+    }
+
+    .location .more>div {
+      align-items: center;
+      background: #F5F5F5;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      display: flex;
+      font-size: 10px;
+      gap: 5px;
+    }
+
+    .location.highlight {
+      background-color: #FFFFFF;
+      border-radius: 8px;
+      box-shadow: 10px 10px 5px rgba(0, 0, 0, 0.2);
+      height: 100px;
+      padding: 8px 15px;
+      width: auto;
+      max-width: 300px;
+    }
+
+    .location.highlight::after {
+      border-top: 9px solid #FFFFFF;
+    }
+
+    .location.highlight .details {
+      display: flex;
+    }
+
+    .location.highlight .mapIcon svg {
+      width: 25px;
+      height: 25px;
+    }
+
+    .location.highlight:has(.fa-location-dot) .mapIcon {
+      color: var(--location-dot-color);
+    }
+
+    .location:not(.highlight):has(.fa-location-dot) {
+      background-color: var(--location-dot-color);
+    }
+
+    .location:not(.highlight):has(.fa-location-dot)::after {
+      border-top: 9px solid var(--location-dot-color);
+    }
+
+    .map-container {
+      display: flex;
+      flex-direction: row;
+      gap: 5px;
+      height: 500px;
+    }
+
+   
+  </style>
+  <!-- prettier-ignore -->
+  <script>(g => { var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window; b = b[c] || (b[c] = {}); var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams, u = () => h || (h = new Promise(async (f, n) => { await (a = m.createElement("script")); e.set("libraries", [...r] + ""); for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]); e.set("callback", c + ".maps." + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e; d[q] = f; a.onerror = () => h = n(Error(p + " could not load.")); a.nonce = m.querySelector("script[nonce]")?.nonce || ""; m.head.append(a) })); d[l] ? console.warn(p + " only loads once. Ignoring:", g) : d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)) })
+      ({ key: "AIzaSyCjxBU2Rmj9czK28LqDbXvQIp5ccel9iwE", v: "weekly" });</script>
+</head>
+
+
+<body>
+
+  <script>
+    let currentActivePopup = null;
+    const allMarkers = []
+    const allData = []
+    let map;
+
+    async function initMap() {
+      const { Map } = await google.maps.importLibrary("maps");
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+
+      const center = { lat: 38.88817647939797, lng: -77.08536761225741 };
+      map = new Map(document.getElementById("map"), {
+        zoom: 13,
+        center,
+        mapId: "c6c53e88a98a6e41",
+        mapTypeControl: false,
+        streetViewControl: false
+      });
+
+      map.addListener("click", () => {
+        if (currentActivePopup) {
+          currentActivePopup.content.classList.remove("highlight");
+          currentActivePopup.zIndex = null;
+          currentActivePopup = null;
+        }
+      });
+
+      map.addListener("idle", () => {
+        fetchData(map).then(response => response.json()).then(data => {
+
+          data.forEach(element => {
+            const item = allData.find(item => {
+              return item && item.UrlPath === element.UrlPath
+            })
+            if (!item) {
+              allData.push(element)
+            }
+          })
+
+          const visibleMarkers = allData.filter(property => {
+            const lat = property.Latitude;
+            const lng = property.Longitude;
+            return map.getBounds().contains({ lat, lng })
+          })
+
+          visibleMarkers.forEach(property => {
+            const item = allMarkers.find(item => {
+              return item && item.title === property.Title
+            })
+            if (!item) {
+              const Marker = new AdvancedMarkerElement({
+                map,
+                content: buildContent(property),
+                position: { lat: property.Latitude, lng: property.Longitude },
+                title: property.Title,
+              });
+              Marker.addListener("click", () => {
+                toggleHighlight(map, Marker, property);
+              });
+              allMarkers.push(Marker)
+            }
+          })
+
+          console.log('allMarkers', allMarkers);
+
+        })
+      })
+    }
+
+    initMap()
+
+    async function fetchData(map) {
+
+      const bounds = map.getBounds();
+      const [minLat, maxLat, minLong, maxLong] = [bounds.getSouthWest().lat(), bounds.getNorthEast().lat(), bounds.getSouthWest().lng(), bounds.getNorthEast().lng()]
+      //http://api.kidokinetics.com/POI?minLat=40.90&maxLat=41.60&minLong=-82.00&maxLong=-80.50
+      const url = `https://serg.one/cors.php?query=`;
+      const param = encodeURIComponent(`http://api.kidokinetics.com/POI?minLat=${minLat}&maxLat=${maxLat}&minLong=${minLong}&maxLong=${maxLong}`)
+      //bypass CORS
+      return fetch(url + param)
+
+    }
+
+    function toggleHighlight(map, markerView, property) {
+      if (currentActivePopup && currentActivePopup !== markerView) {
+        currentActivePopup.content.classList.remove("highlight");
+        currentActivePopup.zIndex = null;
+      }
+
+      if (markerView.content.classList.contains("highlight")) {
+        markerView.content.classList.remove("highlight");
+        markerView.zIndex = null;
+        currentActivePopup = null;
+      } else {
+        markerView.content.classList.add("highlight");
+        markerView.zIndex = 1;
+        currentActivePopup = markerView;
+        map.panTo(markerView.position);
+      }
+    }
+
+    function buildContent(location) {
+      console.log('location', location);
+      const content = document.createElement("div");
+      content.classList.add("location");
+      content.innerHTML = `
+            <div class="mapIcon">
+               <img style="width:20px;" src="https://cdn.kidokinetics.com/images/Kido/Kidokinetics-logo-only.png"/>
+            </div>
+            <div class="details">
+                <div><a target="_blank" href="/event/${location.UrlPath}">${location.Title}</a></div>
+                <div class="address">${location.OrganizationName}</div>
+            </div>
+                      `;
+      return content;
+    }
+
+  </script>
+
+  <div class="map-container">
+    <div id="cards"></div>
+    <div id="map" style="width: 100%; height: 600px;"></div>
+  </div>
+
+</body>
+
+</html>
